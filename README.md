@@ -4,30 +4,30 @@
 # 📈 Trader Performance vs. Market Sentiment Analysis
 
 **Candidate:** Nitish Patel  
-**Role:** Data Science Intern Candidate  
-**Target:** Primetrade.ai / Anything.ai  
+**Role:** Junior Data Scientist Candidate  
+**Target Team:** Primetrade.ai / Anything.ai  
+**Live Dashboard:** [View Interactive Analytics](https://trader-sentiment-analysis-liygpgx6ybudqn5btq4uca.streamlit.app/)
 
 ## 🎯 Project Objective
 This project explores the intersection of macroeconomic psychology and micro-level quantitative execution. By merging the **Bitcoin Fear & Greed Index** with over 210,000 historical trade logs from the **Hyperliquid** platform, this analysis aims to uncover behavioral inefficiencies—such as FOMO, revenge trading, and risk expansion—and translate them into systematic trading rules.
 
 ## 📂 Repository Structure
-* `trader_behavior_analysis.ipynb` - The primary Jupyter Notebook containing the complete Python workflow (Data Cleaning, EDA, Segmentation, Machine Learning).
-* `/charts/` - Contains all exported high-resolution visualizations used in the analysis.
-* `/data/` - *(Ignored via .gitignore)* Local directory for the raw `fear_greed_index.csv` and `historical_data.csv` datasets.
-* `requirements.txt` - Python dependencies required to reproduce the environment.
+* `app.py` - Production code for the live Streamlit dashboard.
+* `trader_behavior_analysis.ipynb` - Comprehensive research notebook including Data Cleaning, EDA, and Machine Learning.
+* `requirements.txt` - Dependency list for reproducing the environment.
+* `Data/` - Contains the processed datasets used for analysis and the dashboard.
+* `charts/` - High-resolution visualizations exported from the analysis.
 
 ## ⚙️ Methodology & Reproducibility
 The analysis follows a strict end-to-end data science lifecycle:
-1. **Data Alignment & Cleaning:** Normalized timestamps across diverse datasets to perform daily temporal alignment. Handled missing margin data by establishing synthetic risk proxies to demonstrate quantitative workflows.
-2. **Feature Engineering:** Developed custom trader KPIs, including *Daily PnL*, *Trade Frequency*, *Average Trade Size*, *Long/Short Ratio*, and *Average Leverage*.
-3. **Behavioral Cohort Analysis:** Segmented traders using statistical medians (e.g., High vs. Low Leverage, Consistent Winners vs. Inconsistent Traders) to isolate systemic edge.
-4. **Predictive Machine Learning:** Deployed a `RandomForestClassifier` to predict daily profitability based purely on execution mechanics and market sentiment.
+1. **Data Alignment:** Normalized diverse temporal datasets to perform daily alignment between execution logs and sentiment scores.
+2. **Feature Engineering:** Developed custom trader KPIs: *Daily PnL*, *Trade Frequency*, *Long/Short Ratio*, and *Average Leverage*.
+3. **Behavioral Archetyping:** Used **K-Means Clustering** to segment traders into distinct archetypes based on risk profile and execution consistency.
+4. **Predictive Modeling:** Deployed a **RandomForestClassifier** to determine the probability of a profitable session based on market sentiment and historical execution mechanics.
 
-### Quick Start
-To reproduce this environment locally, run the following commands in your terminal:
-
+### Quick Start (Local Setup)
 ```bash
 git clone [https://github.com/nitishpatel19/trader-sentiment-analysis.git](https://github.com/nitishpatel19/trader-sentiment-analysis.git)
 cd trader-sentiment-analysis
 pip install -r requirements.txt
-jupyter notebook trader_behavior_analysis.ipynb
+streamlit run app.py

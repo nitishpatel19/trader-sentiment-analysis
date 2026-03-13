@@ -10,121 +10,126 @@ Original file is located at
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
+import os
 
-# Set professional page configuration
+# --- PAGE CONFIG ---
 st.set_page_config(
-    page_title="Hyperliquid Trader Behavior Dashboard",
-    page_icon="📈",
+    page_title="Trader Sentiment Analysis Dashboard",
+    page_icon="📊",
     layout="wide"
 )
 
-# --- 1. Load Data ---
+# --- DATA LOADING ---
 @st.cache_data
 def load_data():
-    # Ensure this filename matches exactly what you uploaded to GitHub
-    df = pd.read_csv('dashboard_data.csv')
-    df['date'] = pd.to_datetime(df['date'])
+    # Check if the file exists to provide better error messages
+    file_path = 'dashboard_data.csv'
+    if not os.path.exists(file_path):
+        return None
+
+    df = pd.read_csv(file_path)
+    # Ensure dates are in the right format
+    if 'date' in df.columns:
+        df['date'] = pd.to_datetime(df['date'])
     return df
 
-try:
-    df = load_data()
-except Exception as e:
-    st.error(f"Error loading data: {e}")
-    st.info("Ensure 'dashboard_data.csv' is in the root of your GitHub repository.")
+# Initialize Data
+df = load_data()
+
+# --- ERROR HANDLING IF FILE MISSING ---
+if df is None:
+    st.error("❌ **File Not Found:** `dashboard_data.csv` was not found in your GitHub repository.")
+    st.info("""
+    **How to fix this:**
+    1. Go to your Google Colab.
+    2. Run the cell: `df_final.to_csv('dashboard_data.csv', index=False)`
+    3. Download the file from the sidebar.
+    4. Upload it to the **root** of your GitHub repository.
+    5. Refresh this page.
+    """)
     st.stop()
 
-# --- 2. Sidebar Filters ---
-st.sidebar.header("Filter Analytics")
-sentiment_options = ['Extreme Fear', 'Fear', 'Neutral', 'Greed', 'Extreme Greed']
-selected_sentiment = st.sidebar.multiselect(
-    "Market Sentiment Phase:",
-    options=sentiment_options,
-    default=sentiment_options
-)
+# --- SIDEBAR FILTERS ---
+st.sidebar.header("Filter Settings")
+if 'classification' in df.columns:
+    sentiment_order = ['Extreme Fear', 'Fear', 'Neutral', 'Greed', 'Extreme Greed']
+    # Only show categories that actually exist in the data
+    available_sentiment = [s for s in sentiment_order if s in df['classification'].unique()]
 
-# Filter dataframe based on selection
-filtered_df = df[df['classification'].isin(selected_sentiment)]
+    selected_sentiment = st.sidebar.multiselect(
+        "Market Sentiment:",
+        options=available_sentiment,
+        default=available_sentiment
+    )
+    filtered_df = df[df['classification'].isin(selected_sentiment)]
+else:
+    filtered_df = df
 
-# --- 3. Header Section ---
-st.title("📈 Trader Performance vs. Market Sentiment")
-st.markdown("""
-This dashboard explores how retail trader behavior shifts during different psychological phases of the market.
-Data sourced from **Hyperliquid Trade Logs** and aligned with the **Bitcoin Fear & Greed Index**.
-""")
+# --- MAIN DASHBOARD ---
+st.title("📈 Trader Behavior vs. Market Sentiment")
+st.markdown("Analyzing how **Bitcoin Fear & Greed** influences trading execution and profitability.")
 
-# --- 4. High-Level Metrics (KPIs) ---
+# --- KPI METRICS ---
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
-    avg_pnl = filtered_df['daily_pnl'].mean()
-    st.metric("Avg Daily PnL", f"${avg_pnl:,.2f}", delta=None)
+    avg_pnl = filtered_df['daily_pnl'].mean() if 'daily_pnl' in filtered_df.columns else 0
+    st.metric("Avg Daily PnL", f"${avg_pnl:,.2f}")
 
 with col2:
-    avg_lev = filtered_df['avg_leverage'].mean()
-    st.metric("Avg Leverage Used", f"{avg_lev:.2f}x")
+    avg_lev = filtered_df['avg_leverage'].mean() if 'avg_leverage' in filtered_df.columns else 0
+    st.metric("Avg Leverage", f"{avg_lev:.2f}x")
 
 with col3:
-    total_trades = filtered_df['trades_per_day'].sum()
-    st.metric("Total Executions", f"{int(total_trades):,}")
+    trades = filtered_df['trades_per_day'].sum() if 'trades_per_day' in filtered_df.columns else 0
+    st.metric("Total Trades", f"{int(trades):,}")
 
 with col4:
-    ls_ratio = filtered_df['long_short_ratio'].mean()
+    ls_ratio = filtered_df['long_short_ratio'].mean() if 'long_short_ratio' in filtered_df.columns else 0
     st.metric("Avg L/S Ratio", f"{ls_ratio:.2f}")
 
 st.divider()
 
-# --- 5. Behavioral Visualizations ---
-col_left, col_right = st.columns(2)
+# --- VISUALIZATIONS ---
+row1_col1, row1_col2 = st.columns(2)
 
-with col_left:
-    st.subheader("Risk Appetite: Leverage vs. Sentiment")
-    # Custom color map for sentiment
-    color_map = {
-        'Extreme Fear': '#d73027', 'Fear': '#f46d43',
-        'Neutral': '#fee08b', 'Greed': '#66bd63',
-        'Extreme Greed': '#1a9850'
-    }
-    fig_lev = px.box(
+with row1_col1:
+    st.subheader("Profitability by Sentiment")
+    fig_pnl = px.box(
+        filtered_df,
+        x='classification',
+        y='daily_pnl',
+        color='classification',
+        category_orders={"classification": available_sentiment},
+        color_discrete_sequence=px.colors.diverging.RdYlGn
+    )
+    st.plotly_chart(fig_pnl, use_container_width=True)
+
+with row1_col2:
+    st.subheader("Leverage Distribution")
+    fig_lev = px.violin(
         filtered_df,
         x='classification',
         y='avg_leverage',
         color='classification',
-        category_orders={"classification": sentiment_options},
-        color_discrete_map=color_map,
-        points=False # Hide outliers for cleaner look
+        box=True,
+        category_orders={"classification": available_sentiment}
     )
     st.plotly_chart(fig_lev, use_container_width=True)
 
-with col_right:
-    st.subheader("Platform Churn: Trade Frequency")
-    freq_data = filtered_df.groupby('classification')['trades_per_day'].median().reindex(sentiment_order=sentiment_options).reset_index()
-    fig_freq = px.bar(
-        freq_data,
-        x='classification',
-        y='trades_per_day',
-        color='classification',
-        color_discrete_map=color_map,
-        labels={'trades_per_day': 'Median Trades/Day'}
-    )
-    st.plotly_chart(fig_freq, use_container_width=True)
-
 st.divider()
 
-# --- 6. Sentiment Regression View ---
-st.subheader("Correlation: Market Psychology vs. Profitability")
+st.subheader("Relationship: Sentiment Score vs. Trader PnL")
 fig_scatter = px.scatter(
     filtered_df,
     x='value',
     y='daily_pnl',
     color='classification',
-    hover_data=['Account', 'avg_leverage'],
-    opacity=0.5,
-    trendline="ols", # Adds a trendline to show relationship
-    labels={'value': 'Fear & Greed Score (0-100)', 'daily_pnl': 'Daily PnL (USD)'}
+    hover_data=['avg_leverage', 'trades_per_day'],
+    labels={'value': 'Fear & Greed Index Score', 'daily_pnl': 'Daily PnL ($)'},
+    trendline="ols" if len(filtered_df) > 1 else None # Needs statsmodels in requirements.txt
 )
-fig_scatter.add_hline(y=0, line_dash="dash", line_color="white")
 st.plotly_chart(fig_scatter, use_container_width=True)
 
-st.caption("Built for Primetrade.ai Internship Evaluation | Candidate: Nitish Patel")
+st.caption("Developed by Nitish Patel | Data: Hyperliquid Execution Logs")
 

@@ -22,13 +22,13 @@ st.set_page_config(
 # --- DATA LOADING ---
 @st.cache_data
 def load_data():
-    # Check if the file exists to provide better error messages
-    file_path = 'dashboard_data.csv'
+    # Aapke GitHub screenshot ke according path 'Data/' folder mein hai
+    file_path = 'Data/dashboard_data.csv'
+
     if not os.path.exists(file_path):
         return None
 
     df = pd.read_csv(file_path)
-    # Ensure dates are in the right format
     if 'date' in df.columns:
         df['date'] = pd.to_datetime(df['date'])
     return df
@@ -36,100 +36,69 @@ def load_data():
 # Initialize Data
 df = load_data()
 
-# --- ERROR HANDLING IF FILE MISSING ---
+# --- ERROR HANDLING ---
 if df is None:
-    st.error("❌ **File Not Found:** `dashboard_data.csv` was not found in your GitHub repository.")
+    st.error("❌ **File Not Found:** `Data/dashboard_data.csv` nahi mili.")
     st.info("""
-    **How to fix this:**
-    1. Go to your Google Colab.
-    2. Run the cell: `df_final.to_csv('dashboard_data.csv', index=False)`
-    3. Download the file from the sidebar.
-    4. Upload it to the **root** of your GitHub repository.
-    5. Refresh this page.
+    **Checklist:**
+    1. Kya aapne `dashboard_data.csv` ko `Data` naam ke folder mein dala hai?
+    2. GitHub par folder ka naam 'Data' (Capital D) hai ya 'data' (Small d)? Code mein exact match hona chahiye.
     """)
     st.stop()
 
 # --- SIDEBAR FILTERS ---
 st.sidebar.header("Filter Settings")
-if 'classification' in df.columns:
-    sentiment_order = ['Extreme Fear', 'Fear', 'Neutral', 'Greed', 'Extreme Greed']
-    # Only show categories that actually exist in the data
-    available_sentiment = [s for s in sentiment_order if s in df['classification'].unique()]
+sentiment_order = ['Extreme Fear', 'Fear', 'Neutral', 'Greed', 'Extreme Greed']
+available_sentiment = [s for s in sentiment_order if s in df['classification'].unique()]
 
-    selected_sentiment = st.sidebar.multiselect(
-        "Market Sentiment:",
-        options=available_sentiment,
-        default=available_sentiment
-    )
-    filtered_df = df[df['classification'].isin(selected_sentiment)]
-else:
-    filtered_df = df
+selected_sentiment = st.sidebar.multiselect(
+    "Market Sentiment Phase:",
+    options=available_sentiment,
+    default=available_sentiment
+)
 
-# --- MAIN DASHBOARD ---
+filtered_df = df[df['classification'].isin(selected_sentiment)]
+
+# --- HEADER ---
 st.title("📈 Trader Behavior vs. Market Sentiment")
-st.markdown("Analyzing how **Bitcoin Fear & Greed** influences trading execution and profitability.")
+st.markdown(f"Showing analysis for {len(filtered_df)} data points.")
 
 # --- KPI METRICS ---
-col1, col2, col3, col4 = st.columns(4)
-
-with col1:
-    avg_pnl = filtered_df['daily_pnl'].mean() if 'daily_pnl' in filtered_df.columns else 0
-    st.metric("Avg Daily PnL", f"${avg_pnl:,.2f}")
-
-with col2:
-    avg_lev = filtered_df['avg_leverage'].mean() if 'avg_leverage' in filtered_df.columns else 0
-    st.metric("Avg Leverage", f"{avg_lev:.2f}x")
-
-with col3:
-    trades = filtered_df['trades_per_day'].sum() if 'trades_per_day' in filtered_df.columns else 0
-    st.metric("Total Trades", f"{int(trades):,}")
-
-with col4:
-    ls_ratio = filtered_df['long_short_ratio'].mean() if 'long_short_ratio' in filtered_df.columns else 0
-    st.metric("Avg L/S Ratio", f"{ls_ratio:.2f}")
+m1, m2, m3, m4 = st.columns(4)
+m1.metric("Avg Daily PnL", f"${filtered_df['daily_pnl'].mean():,.2f}")
+m2.metric("Avg Leverage", f"{filtered_df['avg_leverage'].mean():.2f}x")
+m3.metric("Total Trades", f"{int(filtered_df['trades_per_day'].sum()):,}")
+m4.metric("Avg L/S Ratio", f"{filtered_df['long_short_ratio'].mean():.2f}")
 
 st.divider()
 
-# --- VISUALIZATIONS ---
-row1_col1, row1_col2 = st.columns(2)
+# --- CHARTS ---
+col1, col2 = st.columns(2)
 
-with row1_col1:
-    st.subheader("Profitability by Sentiment")
+with col1:
+    st.subheader("Profitability Distribution")
     fig_pnl = px.box(
-        filtered_df,
-        x='classification',
-        y='daily_pnl',
-        color='classification',
-        category_orders={"classification": available_sentiment},
+        filtered_df, x='classification', y='daily_pnl', color='classification',
+        category_orders={"classification": sentiment_order},
         color_discrete_sequence=px.colors.diverging.RdYlGn
     )
     st.plotly_chart(fig_pnl, use_container_width=True)
 
-with row1_col2:
-    st.subheader("Leverage Distribution")
+with col2:
+    st.subheader("Risk Appetite (Leverage)")
     fig_lev = px.violin(
-        filtered_df,
-        x='classification',
-        y='avg_leverage',
-        color='classification',
-        box=True,
-        category_orders={"classification": available_sentiment}
+        filtered_df, x='classification', y='avg_leverage', color='classification',
+        box=True, category_orders={"classification": sentiment_order}
     )
     st.plotly_chart(fig_lev, use_container_width=True)
 
 st.divider()
 
-st.subheader("Relationship: Sentiment Score vs. Trader PnL")
+# --- REGRESSION SCATTER ---
+st.subheader("Sentiment Score vs. Daily PnL")
 fig_scatter = px.scatter(
-    filtered_df,
-    x='value',
-    y='daily_pnl',
-    color='classification',
-    hover_data=['avg_leverage', 'trades_per_day'],
-    labels={'value': 'Fear & Greed Index Score', 'daily_pnl': 'Daily PnL ($)'},
-    trendline="ols" if len(filtered_df) > 1 else None # Needs statsmodels in requirements.txt
+    filtered_df, x='value', y='daily_pnl', color='classification',
+    trendline="ols", labels={'value': 'Fear & Greed Score', 'daily_pnl': 'PnL ($)'}
 )
 st.plotly_chart(fig_scatter, use_container_width=True)
-
-st.caption("Developed by Nitish Patel | Data: Hyperliquid Execution Logs")
 
